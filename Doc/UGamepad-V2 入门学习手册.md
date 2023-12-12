@@ -1,4 +1,5 @@
 
+
 # 序
 
 欢迎踏入LDSCITECH的评估板世界，一个充满激情、创新和未知可能性的领域！评估板是连接你和技术未来之间的桥梁，它们是探索新概念、验证创意和打造创新产品的关键。在这个令人兴奋的旅程中，LDSCITECH将与您一同探索微控制器、传感器和电机评估板的神奇世界。
@@ -36,9 +37,10 @@ LDSCITECH始终秉承着开放、包容和学习的精神，我们期待与您�
 
 # 第一部分、硬件概述
 
-## 1.1 实物概图
+## 1.1 3D图
 
-![在这里插图1.1入图片描述](https://img-blog.csdnimg.cn/dbe1bafc733f41f9acd1dc247c93d09e.png#pic_center)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/1f243e531c824c7c92ab98acf9c48af7.png#pic_center)
+
 
 
 如图1.1所示Gamepad评估板配置了8个6*6轻触按键，一个摇杆（Joystick），搭载一颗WS2812B灯珠，并将UART1串口，编程接口（SWD），外接Joystick接口，Type-C接口引出;  
@@ -88,14 +90,20 @@ MounRiver Studio基于Eclipse GNU版本开发，在保留原平台强大代码�
 
 ### 3.1.1硬件设计
 
-   <img src="C:\Users\ysadmin\AppData\Roaming\Typora\typora-user-images\image-20231211171411941.png" alt="image-20231211171411941" style="zoom: 80%;" />
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/a7001e3beaed438d85322406e46101d2.png#pic_center)
+
 如上图是 11个6x6的独立按键； 
 
 下图是五向开关，支持上下左右中五个方向；
 
-![image-20231211171958936](C:\Users\ysadmin\AppData\Roaming\Typora\typora-user-images\image-20231211171958936.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/60a99857890749448f8080b3c5e92324.png#pic_center)
 
-所以，我们只要配置11个GPIO作为输入去检测按键信号;  
+另外有2个按键是摇杆电位器上的中键，高电平有效
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/b4d84c401bc745cfa4bad9338f81b6e2.png#pic_center)
+
+
+所以，我们只要配置18个GPIO作为输入去检测按键信号;  
 
 ### 3.1.2 软件设计
 
@@ -103,7 +111,8 @@ MounRiver Studio基于Eclipse GNU版本开发，在保留原平台强大代码�
 
 首先是工程树，我们打开工程，可以看到Project Explorer下Gamepad目录如下图
 
-![image](C:\Users\ysadmin\AppData\Roaming\Typora\typora-user-images\image-20231211174033303.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/7a4f032911974a46981e92219484c6de.png#pic_center)
+
 其中
 
 > - __Binaries：__ 二进制文件；
@@ -412,8 +421,165 @@ void ButtonInit(void) {
 ### 3.1.3 下载验证
 
 我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印这18个按键按下的Log信息；
-![在这里插入图片描述](https://img-blog.csdnimg.cn/4668339ed82f4011b61bbdf40d081715.png#pic_center)
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/ef16e31c8fa648ff85efda1b65a6211d.png#pic_center)
+
+## 3.2 实例Eg02_AnalogDebug
+
+该实例是为了测试两个摇杆；我们将采用ADC DMA方式读取4个通道的AD值，并打印出来；
+
+### 3.1.1硬件设计
+
+![image-20231212233809439](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231212233809439.png)
+
+如上图所示，共有4个模拟输入通道，我们将其连接到ADC1、ADC2、ADC4、ADC5； 
 
 
-我们可以摇Joystick和按按键可以发现上图游戏控制器界面也跟着响应。
+
+
+### 3.1.2 软件设计
+
+#### 3.1.2.1 ADC配置
+
+ADC的配置文件为Analog.c和Analog.h;
+
+```C
+/*
+ * Button.c
+ *
+ *  Created on: Dec 4, 2023
+ *      Author: Administrator
+ */
+
+#include "Analog.h"
+
+
+u16 ADC_ConvertedValue[LENGTH]={0};
+
+//ADC对应GPIO初始化配置以及ADC初始化配置
+void adc_Init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    ADC_InitTypeDef ADC_InitStructure;
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA |RCC_APB2Periph_ADC1 , ENABLE ); //使能GPIOA时钟和ADC
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_4|GPIO_Pin_5; //PA1~5对应ADC通道1~5
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN; //GPIO模式为模拟输入
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;  //配置ADC为独立模式
+    ADC_InitStructure.ADC_ScanConvMode = ENABLE;        //多通道模式下开启扫描模式
+    ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;  //设置开启连续转换模式
+    ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None; //设置转换不是由外部触发启动，软件触发启动
+    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right; //设置ADC数据右对齐
+    ADC_InitStructure.ADC_NbrOfChannel = LENGTH;           //规则转换的ADC通道的数目
+    ADC_Init(ADC1, &ADC_InitStructure);                    //根据ADC_InitStructure中指定的参数初始化ADC1寄存器
+
+    RCC_ADCCLKConfig(RCC_PCLK2_Div6); //设置ADC时钟分频为6分频
+
+    ADC_Cmd(ADC1, ENABLE);      //使能ADC1
+
+    ADC_ResetCalibration(ADC1); //重置ADC1校准寄存器。
+
+    while(ADC_GetResetCalibrationStatus(ADC1)); //等待复位校准结束
+
+    ADC_StartCalibration(ADC1); //开启AD校准
+
+    while(ADC_GetCalibrationStatus(ADC1));      //等待校准结束
+}
+
+//ADC DMA模式配置
+void DMA_Tx_Init( void )
+{
+    DMA_InitTypeDef DMA_InitStructure;
+
+    RCC_AHBPeriphClockCmd( RCC_AHBPeriph_DMA1, ENABLE ); //使能开启DMA时钟
+
+    DMA_DeInit(DMA1_Channel1); //复位DMA控制器
+
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)&ADC1->RDATAR;  //配置外设地址为ADC数据寄存器地址
+    DMA_InitStructure.DMA_MemoryBaseAddr = (u32)ADC_ConvertedValue; //配置存储器地址为读取ADC值地址
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;              //配置数据源为外设，即DMA传输方式为外设到存储器
+    DMA_InitStructure.DMA_BufferSize = LENGTH;                      //设置DMA数据缓冲区大小，此处设置为LENGTH
+    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;//设置DMA外设递增模式关闭
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;         //设置DMA存储器递增模式开启
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord; //设置外设数据大小为半字，即两个字节
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;         //设置存储器数据大小为半字，即两个字节
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;     //设置DMA模式为循环传输模式
+    DMA_InitStructure.DMA_Priority = DMA_Priority_High; //设置DMA传输通道优先级为高，当使用一 DMA通道时，优先级设置不影响
+    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;        //因为此DMA传输方式为外设到存储器，因此禁用存储器到存储器传输方式
+    DMA_Init( DMA1_Channel1, &DMA_InitStructure );      //初始化DMA
+
+    DMA_Cmd(DMA1_Channel1 , ENABLE);  //使能DMA
+}
+
+void ADC_DMA_CONF(void)
+{
+    adc_Init();
+
+    DMA_Tx_Init();
+
+    // 配置 ADC 通道转换顺序为1，第一个转换，采样时间为55.5个时钟周期
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_239Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 2, ADC_SampleTime_239Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_4, 3, ADC_SampleTime_239Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_5, 4, ADC_SampleTime_239Cycles5);
+
+    // 使能ADC DMA 请求
+    ADC_DMACmd(ADC1, ENABLE);
+
+    // 由于没有采用外部触发，所以使用软件触发ADC转换
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+}
+
+
+```
+
+这段C代码是用于配置和使用模拟-数字转换器（ADC）和直接内存访问（DMA）的函数。主要步骤如下：
+
+1. **ADC初始化（`adc_Init`函数）：**
+   - 配置GPIO引脚，使其成为模拟输入。
+   - 初始化ADC，设置为独立模式、连续转换模式，并启用扫描模式。
+   - 配置ADC通道和执行校准。
+2. **DMA初始化（`DMA_Tx_Init`函数）：**
+   - 配置DMA，将ADC的转换结果传输到内存中的数组中。
+   - 配置DMA为循环传输模式，以便持续地将ADC转换结果传输到数组中。
+3. **ADC和DMA配置（`ADC_DMA_CONF`函数）：**
+   - 调用`adc_Init`和`DMA_Tx_Init`函数以配置ADC和DMA。
+   - 配置ADC通道，设置采样时间。
+   - 启用ADC的DMA请求。
+   - 使用软件触发启动ADC转换。
+
+总体而言，这段代码的功能是初始化ADC和DMA，使系统能够以连续模式从多个通道采集模拟信号，并将结果存储在一个数组中。这对于需要高效处理模拟信号的应用（例如传感器数据采集）是很常见的配置。
+
+#### 3.1.2.1 访问打印AD值
+
+在main函数while循环里面，我们每隔500ms打印一次AD值
+
+```c
+    while(1)
+    {
+        tick++;
+        if((tick%100)==0)//500ms
+        {
+            tick=0;
+            printf("\r\n The current ADCH1 value = %d \r\n", ADC_ConvertedValue[0]);
+            printf("\r\n The current ADCH2 value = %d \r\n", ADC_ConvertedValue[1]);
+            printf("\r\n The current ADCH3 value = %d \r\n", ADC_ConvertedValue[2]);
+            printf("\r\n The current ADCH4 value = %d \r\n", ADC_ConvertedValue[3]);
+        }
+        button_ticks();
+        Delay_Ms(5);
+    }
+```
+
+
+
+
+### 3.1.3 下载验证
+
+我们把固件程序下载进去可以，打开串口调试助手；摇动摇杆打印Log信息；
+
+
 

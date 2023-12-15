@@ -581,21 +581,21 @@ int main(void)
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/f9c0bb22b2ee43728a6ca96eeeaf0b80.png)
 
-## 3.2 实例Eg03_MultiTimer
+## 3.3 实例Eg03_MultiTimer
 
 本节使用一个开源的软件定时器套件MultiTimer来实现一个软件框架，用于实现LED、ADC、按键多任务；关于MultiTimer开源，大家可以访问开源的GitHub链接学习：https://github.com/0x1abin/MultiTimer.git
 
 
-### 3.2.1硬件设计
+### 3.3.1硬件设计
 
 本节用到摇杆电位器按钮和LED，摇杆电位器和按键上两节已经介绍，LED的原理图如下：
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/8a050ad74de049ee9ebf5d4121f2ac96.png)
 LED接到了MCU的PB3：
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/fcda7902e7e34a74af424b84adc1551d.png)
 
-### 3.2.2 软件设计
+### 3.3.2 软件设计
 
-#### 3.2.2.1 LED配置
+#### 3.3.2.1 LED配置
 
 
 ```c
@@ -636,7 +636,7 @@ extern void LED_Init(void);
 #endif /* MYBSP_LED_H_ */
 ```
 
-#### 3.2.2.2 SYStick配置
+#### 3.3.2.2 SYStick配置
 因为MultiTimer需要就像RTOS需要Tick，这里配置Systick作为它的时基；
 ```c
 void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -666,7 +666,7 @@ void SysTick_Handler(void)
 }
 ```
 
-#### 3.2.2.2 SYStick配置
+#### 3.3.2.3 应用代码
 最后我们创建三个定时器分别执行对应的任务，如下代码：
 
 ```c
@@ -710,7 +710,145 @@ void PollSystemInit(void) {
 
 ```
 
-### 3.2.3 下载验证
+### 3.3.3 下载验证
+
+我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印三个任务Log信息；
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/0e664def8cf446f2af99d8f53f3af23e.png)
+
+## 3.4 实例Eg04_MultiTimer
+
+本节使用一个开源的软件定时器套件MultiTimer来实现一个软件框架，用于实现LED、ADC、按键多任务；关于MultiTimer开源，大家可以访问开源的GitHub链接学习：https://github.com/0x1abin/MultiTimer.git
+
+
+### 3.3.1硬件设计
+
+本节用到摇杆电位器按钮和LED，摇杆电位器和按键上两节已经介绍，LED的原理图如下：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/8a050ad74de049ee9ebf5d4121f2ac96.png)
+LED接到了MCU的PB3：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/fcda7902e7e34a74af424b84adc1551d.png)
+
+### 3.3.2 软件设计
+
+#### 3.3.2.1 LED配置
+
+
+```c
+#include "LED.h"
+
+/*********************************************************************
+ * @fn      GPIO_Toggle_INIT
+ *
+ * @brief   Initializes GPIOA.0
+ *
+ * @return  none
+ */
+void LED_Init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+}
+```
+
+这段代码的功能是配置LED的PB3作为推挽输出；
+
+同时LED.h 用一个宏实现IO拉高拉低；
+
+```c
+#ifndef MYBSP_LED_H_
+#define MYBSP_LED_H_
+
+#include "debug.h"
+
+#define     LED(x)      (x?GPIO_ResetBits(GPIOB,GPIO_Pin_3):GPIO_SetBits(GPIOB,GPIO_Pin_3))
+
+extern void LED_Init(void);
+
+#endif /* MYBSP_LED_H_ */
+```
+
+#### 3.3.2.2 SYStick配置
+
+因为MultiTimer需要就像RTOS需要Tick，这里配置Systick作为它的时基；
+
+```c
+void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+
+/*********************************************************************
+ * @fn      SYSTICK_Init_Config
+ *
+ * @brief   SYSTICK_Init_Config.
+ *
+ * @return  none
+ */
+void SYSTICK_Init_Config(u64 ticks)
+{
+    SysTick->SR = 0;
+    SysTick->CNT = 0;
+    SysTick->CMP = ticks;
+    SysTick->CTLR =0xF;
+
+    NVIC_SetPriority(SysTicK_IRQn, 15);
+    NVIC_EnableIRQ(SysTicK_IRQn);
+}
+
+void SysTick_Handler(void)
+{
+    SysTick->SR = 0;
+    uwTick++;
+}
+```
+
+#### 3.3.2.3 应用代码
+
+最后我们创建三个定时器分别执行对应的任务，如下代码：
+
+```c
+vu32 uwTick;
+
+MultiTimer timer1;
+MultiTimer timer2;
+MultiTimer timer3;
+uint64_t PlatformTicksGetFunc(void) {
+    return uwTick;
+}
+void LEDTimer1Callback(MultiTimer* timer, void *userData)
+{
+    static FlagStatus LedSta=RESET;
+    LED(LedSta);
+    LedSta=~LedSta;
+    printf("LED Status:%d\r\n",LedSta);
+    MultiTimerStart(timer, 500, LEDTimer1Callback, userData);
+}
+void ADCTimer2Callback(MultiTimer* timer, void *userData)
+{
+    printf("\r\n The current ADCH1 value = %d \r\n", ADC_ConvertedValue[0]);
+    printf("\r\n The current ADCH2 value = %d \r\n", ADC_ConvertedValue[1]);
+    printf("\r\n The current ADCH3 value = %d \r\n", ADC_ConvertedValue[2]);
+    printf("\r\n The current ADCH4 value = %d \r\n", ADC_ConvertedValue[3]);
+
+    MultiTimerStart(timer, 1000, ADCTimer2Callback, userData);
+}
+void ButtonTimer3Callback(MultiTimer* timer, void *userData)
+{
+    button_ticks();;
+    MultiTimerStart(timer, 5, ButtonTimer3Callback, userData);
+}
+void PollSystemInit(void) {
+    MultiTimerInstall(PlatformTicksGetFunc);
+    MultiTimerStart(&timer1, 500, LEDTimer1Callback, NULL);
+    MultiTimerStart(&timer2, 1000, ADCTimer2Callback, NULL);
+    MultiTimerStart(&timer3, 5, ButtonTimer3Callback, NULL);
+    SYSTICK_Init_Config(SystemCoreClock/1000-1);
+}
+
+```
+
+### 3.3.3 下载验证
 
 我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印三个任务Log信息；
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/0e664def8cf446f2af99d8f53f3af23e.png)

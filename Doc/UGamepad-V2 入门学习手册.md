@@ -715,21 +715,21 @@ void PollSystemInit(void) {
 我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印三个任务Log信息；
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/0e664def8cf446f2af99d8f53f3af23e.png)
 
-## 3.4 实例Eg04_MultiTimer
+## 3.4 实例Eg04_Mouse
 
-本节使用一个开源的软件定时器套件MultiTimer来实现一个软件框架，用于实现LED、ADC、按键多任务；关于MultiTimer开源，大家可以访问开源的GitHub链接学习：https://github.com/0x1abin/MultiTimer.git
+本节实现一个模拟鼠标功能；左摇杆实现的是XY轴移动；右摇杆实现的是滚轮上下，右摇杆按键实现的是鼠标中键，X和B键实现的是鼠标左右键；
 
 
-### 3.3.1硬件设计
+### 3.2.1硬件设计
 
-本节用到摇杆电位器按钮和LED，摇杆电位器和按键上两节已经介绍，LED的原理图如下：
-![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/8a050ad74de049ee9ebf5d4121f2ac96.png)
-LED接到了MCU的PB3：
-![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/fcda7902e7e34a74af424b84adc1551d.png)
+前面几个章节基本把所需的硬件介绍完成，本节开始，硬件直接参考原理图文档。
 
-### 3.3.2 软件设计
 
-#### 3.3.2.1 LED配置
+### 3.2.2 软件设计
+
+我们直接在官方例程上面把
+
+#### 3.2.2.1 LED配置
 
 
 ```c
@@ -771,7 +771,7 @@ extern void LED_Init(void);
 #endif /* MYBSP_LED_H_ */
 ```
 
-#### 3.3.2.2 SYStick配置
+#### 3.2.2.2 SYStick配置
 
 因为MultiTimer需要就像RTOS需要Tick，这里配置Systick作为它的时基；
 
@@ -803,7 +803,7 @@ void SysTick_Handler(void)
 }
 ```
 
-#### 3.3.2.3 应用代码
+#### 3.2.2.3 应用代码
 
 最后我们创建三个定时器分别执行对应的任务，如下代码：
 
@@ -848,7 +848,8 @@ void PollSystemInit(void) {
 
 ```
 
-### 3.3.3 下载验证
+### 3.2.3 下载验证
 
 我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印三个任务Log信息；
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/0e664def8cf446f2af99d8f53f3af23e.png)
+

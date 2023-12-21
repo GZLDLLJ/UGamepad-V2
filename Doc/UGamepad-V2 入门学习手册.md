@@ -1,7 +1,6 @@
 
 
 
-
 # 序
 
 欢迎踏入LDSCITECH的评估板世界，一个充满激情、创新和未知可能性的领域！评估板是连接你和技术未来之间的桥梁，它们是探索新概念、验证创意和打造创新产品的关键。在这个令人兴奋的旅程中，LDSCITECH将与您一同探索微控制器、传感器和电机评估板的神奇世界。
@@ -720,136 +719,444 @@ void PollSystemInit(void) {
 本节实现一个模拟鼠标功能；左摇杆实现的是XY轴移动；右摇杆实现的是滚轮上下，右摇杆按键实现的是鼠标中键，X和B键实现的是鼠标左右键；
 
 
-### 3.2.1硬件设计
+### 3.4.1硬件设计
 
 前面几个章节基本把所需的硬件介绍完成，本节开始，硬件直接参考原理图文档。
 
 
-### 3.2.2 软件设计
+### 3.4.2 软件设计
 
-我们直接在官方例程上面把
+我们直接在官方例程\CH32V20xEVT\EVT\EXAM\USB\USBFS\DEVICE\CompatibilityHID这个工程目录中User部分USB相关代码（ch32v20x_usb.h、ch32v20x_usbfs_device.c、ch32v20x_usbfs_device.h、usbd_desc.c、usbd_desc.h）复制粘贴到我们自己的Mouse工程中；如下图红色方框所示：
+![Usb部分代码](https://img-blog.csdnimg.cn/direct/0943776cbb194507b54c5227ae75946c.png)
 
-#### 3.2.2.1 LED配置
+
+
+#### 3.4.2.1 USB中断请求
+
+ch32v20x_usbfs_device中的USBHD_IRQHandler是USB的中断服务函数；
+
+Usb标准请求USBFS_SetupReqCode中有个USB_GET_DESCRIPTOR获取描述符的请求，其中获取了以下几种描述符：
+
+USB_DESCR_TYP_DEVICE：设备描述符；
+
+USB_DESCR_TYP_CONFIG：配置描述符；
+
+USB_DESCR_TYP_HID：HID描述符；
+
+USB_DESCR_TYP_REPORT：报表描述符；
+
+USB_DESCR_TYP_STRING；字符串描述符；
+
+上述描述符定义在usbd_desc.c；
+
+##### 3.4.2.1.1 设备描述符
 
 
 ```c
-#include "LED.h"
-
-/*********************************************************************
- * @fn      GPIO_Toggle_INIT
- *
- * @brief   Initializes GPIOA.0
- *
- * @return  none
- */
-void LED_Init(void)
+/* Device Descriptor */
+const uint8_t MyDevDescr[ ] =
 {
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
+    0x12,                                                   // bLength
+    0x01,                                                   // bDescriptorType
+    0x00, 0x02,                                             // bcdUSB
+    0x00,                                                   // bDeviceClass
+    0x00,                                                   // bDeviceSubClass
+    0x00,                                                   // bDeviceProtocol
+    DEF_USBD_UEP0_SIZE,                                     // bMaxPacketSize0
+    (uint8_t)DEF_USB_VID, (uint8_t)( DEF_USB_VID >> 8 ),    // idVendor
+    (uint8_t)DEF_USB_PID, (uint8_t)( DEF_USB_PID >> 8 ),    // idProduct
+    0x00, DEF_IC_PRG_VER,                                   // bcdDevice
+    0x01,                                                   // iManufacturer
+    0x02,                                                   // iProduct
+    0x03,                                                   // iSerialNumber
+    0x01,                                                   // bNumConfigurations
+};
+```
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
+设备描述符的定义注释已经非常清楚，需要注意的是USB_VID和USB_PID，VID是厂商描述符，是需要向Usb-IF组织申请的，PID是产品ID可以自定义；我们这里定义如下：
+
+```c
+#define DEF_USB_VID                   0x0810
+#define DEF_USB_PID                   0x0001
+```
+
+##### 3.4.2.1.2 配置描述符集合
+
+```c
+/* Configuration Descriptor Set */
+const uint8_t MyCfgDescr[ ] =
+{
+        0x09, /* bLength: Configuration Descriptor size */
+        USB_DESC_TYPE_CONFIGURATION, /* bDescriptorType: Configuration */
+        USB_CUSTOM_HID_CONFIG_DESC_SIZ,
+        /* wTotalLength: Bytes returned */
+        0x00,
+        0x01,         /*bNumInterfaces: 1 interface*/
+        0x01,         /*bConfigurationValue: Configuration value*/
+        0x00,         /*iConfiguration: Index of string descriptor describing
+        the configuration*/
+        0xC0,         /*bmAttributes: bus powered */
+        0x32,         /*MaxPower 100 mA: this current is used for detecting Vbus*/
+
+        /************** Descriptor of CUSTOM HID interface ****************/
+        /* 09 */
+        0x09,         /*bLength: Interface Descriptor size*/
+        USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
+        0x00,         /*bInterfaceNumber: Number of Interface*/
+        0x00,         /*bAlternateSetting: Alternate setting*/
+        0x01,         /*bNumEndpoints*/
+        0x03,         /*bInterfaceClass: CUSTOM_HID*/
+        0x00,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x00,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0,            /*iInterface: Index of string descriptor*/
+        /******************** Descriptor of CUSTOM_HID *************************/
+        /* 18 */
+        0x09,         /*bLength: CUSTOM_HID Descriptor size*/
+        CUSTOM_HID_DESCRIPTOR_TYPE, /*bDescriptorType: CUSTOM_HID*/
+        0x11,         /*bCUSTOM_HIDUSTOM_HID: CUSTOM_HID Class Spec release number*/
+        0x01,
+        0x00,         /*bCountryCode: Hardware target country*/
+        0x01,         /*bNumDescriptors: Number of CUSTOM_HID class descriptors to follow*/
+        0x22,         /*bDescriptorType*/
+        USBD_CUSTOM_HID_REPORT_DESC_SIZE,/*wItemLength: Total length of Report descriptor*/
+        0x00,
+        /******************** Descriptor of Custom HID endpoints ********************/
+        /* 27 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+
+        CUSTOM_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        CUSTOM_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
+        /* 34 */
+};
+```
+
+如上图，配置描述符集合里面包含了配置描述符、接口描述符、HID描述符、以及端点描述符；
+
+##### 3.4.2.1.3 报表描述符
+
+```c
+/* Mouse Report Descriptor */
+const uint8_t MouseRepDesc[ ] =
+{
+        0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+        0x09, 0x02,                    // USAGE (Mouse)
+        0xa1, 0x01,                    // COLLECTION (Application)
+        0x09, 0x01,                    //   USAGE (Pointer)
+        0xa1, 0x00,                    //   COLLECTION (Physical)
+        0x05, 0x09,                    //     USAGE_PAGE (Button)
+        0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+        0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x75, 0x01,                    //     REPORT_SIZE (1)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0x95, 0x01,                    //     REPORT_COUNT (1)
+        0x75, 0x05,                    //     REPORT_SIZE (5)
+        0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
+        0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,                    //     USAGE (X)
+        0x09, 0x31,                    //     USAGE (Y)
+        0x09, 0x38,                    //     USAGE (Wheel)
+        0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+        0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+        0x75, 0x08,                    //     REPORT_SIZE (8)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x81, 0x06,                    //     INPUT (Data,Var,Rel)
+        0xc0,                          //   END_COLLECTION
+        0xc0                           //END_COLLECTION
+};
+```
+
+以上是鼠标的报表描述符,详细描述了鼠标协议报文的各个字段。
+
+##### 3.4.2.3 字符串描述符
+
+最后我们来看一下字符串描述符，字符串有以下这些，需要主要的是使用的是Unicode编码：
+
+Descriptor 0, Language descriptor：语言ID描述符；
+
+Descriptor 1, Manufacturers String descriptor：厂商字符串描述符；
+
+Descriptor 2, Product String descriptor：产品字符串描述符；
+
+Descriptor 3, Serial-number String descriptor ：序列号描述符；
+
+###### 3.4.2.3.1 语言ID描述符
+
+语言ID描述符一般比较固定，无需修改；
+
+```c
+/* Language Descriptor */
+const uint8_t MyLangDescr[ ] =
+{
+    0x04,
+    0x03,
+    0x09,
+    0x04
+};
+```
+
+###### 3.4.2.3.2 厂商字符串描述符
+
+这个是厂商名字的编码，这个是我们的商标名称“LDSCITECH”
+
+```c
+/* Manufacturer Descriptor */
+const uint8_t MyManuInfo[ ] =
+{
+    0x16,0x03,0x4C,0x00,0x44,0x00,0x53,0x00,0x43,0x00,0x49,0x00,0x54,0x00,0x45,0x00,
+    0x43,0x00,0x48,0x00,0x45,0x00
+};
+```
+
+###### 3.4.2.3.3 产品字符串描述符
+
+这个是我们自定义的编码，这个名称我们就取"LD Mouse"
+
+```c
+/* Product Information */
+const uint8_t MyProdInfo[ ]  =
+{
+    0x12,0x03,0x4C,0x00,0x44,0x00,0x20,0x00,0x4D,0x00,0x6F,0x00,0x75,0x00,0x73,0x00,
+    0x65,0x00
+};
+```
+
+###### 3.4.2.3.4 序列号描述符
+
+这里的序列号描述符参考了ST的做法，用的是UID，关于UID，我们的CH32V203参考手册也有介绍；
+
+```c
+#define         UID_BASE              0x1FFFF7E8UL    /*!< Unique device ID register base address */
+#define         DEVICE_ID1          (UID_BASE)
+#define         DEVICE_ID2          (UID_BASE + 0x4)
+#define         DEVICE_ID3          (UID_BASE + 0x8)
+
+/* Serial Number Information */
+/* Serial Number Information */
+uint8_t USBD_StringSerial[USB_SIZ_STRING_SERIAL] = {
+        USB_SIZ_STRING_SERIAL,
+        USB_DESC_TYPE_STRING,};
+
+/**
+  * @brief  Convert Hex 32Bits value into char
+  * @param  value: value to convert
+  * @param  pbuf: pointer to the buffer
+  * @param  len: buffer length
+  * @retval None
+  */
+void IntToUnicode(uint32_t value, uint8_t * pbuf, uint8_t len)
+{
+  uint8_t idx = 0;
+
+  for (idx = 0; idx < len; idx++)
+  {
+    if (((value >> 28)) < 0xA)
+    {
+      pbuf[2 * idx] = (value >> 28) + '0';
+    }
+    else
+    {
+      pbuf[2 * idx] = (value >> 28) + 'A' - 10;
+    }
+
+    value = value << 4;
+
+    pbuf[2 * idx + 1] = 0;
+  }
+}
+void Get_SerialNum(void)
+{
+  uint32_t deviceserial0, deviceserial1, deviceserial2;
+
+  deviceserial0 = *(uint32_t *) DEVICE_ID1;
+  deviceserial1 = *(uint32_t *) DEVICE_ID2;
+  deviceserial2 = *(uint32_t *) DEVICE_ID3;
+
+  deviceserial0 += deviceserial2;
+
+  if (deviceserial0 != 0)
+  {
+    IntToUnicode(deviceserial0, &USBD_StringSerial[2], 8);
+    IntToUnicode(deviceserial1, &USBD_StringSerial[18], 4);
+  }
 }
 ```
 
-这段代码的功能是配置LED的PB3作为推挽输出；
-
-同时LED.h 用一个宏实现IO拉高拉低；
+#### 3.4.2.2 用户代码
 
 ```c
-#ifndef MYBSP_LED_H_
-#define MYBSP_LED_H_
-
-#include "debug.h"
-
-#define     LED(x)      (x?GPIO_ResetBits(GPIOB,GPIO_Pin_3):GPIO_SetBits(GPIOB,GPIO_Pin_3))
-
-extern void LED_Init(void);
-
-#endif /* MYBSP_LED_H_ */
-```
-
-#### 3.2.2.2 SYStick配置
-
-因为MultiTimer需要就像RTOS需要Tick，这里配置Systick作为它的时基；
-
-```c
-void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-
-/*********************************************************************
- * @fn      SYSTICK_Init_Config
- *
- * @brief   SYSTICK_Init_Config.
- *
- * @return  none
- */
-void SYSTICK_Init_Config(u64 ticks)
-{
-    SysTick->SR = 0;
-    SysTick->CNT = 0;
-    SysTick->CMP = ticks;
-    SysTick->CTLR =0xF;
-
-    NVIC_SetPriority(SysTicK_IRQn, 15);
-    NVIC_EnableIRQ(SysTicK_IRQn);
-}
-
-void SysTick_Handler(void)
-{
-    SysTick->SR = 0;
-    uwTick++;
-}
-```
-
-#### 3.2.2.3 应用代码
-
-最后我们创建三个定时器分别执行对应的任务，如下代码：
-
-```c
-vu32 uwTick;
-
-MultiTimer timer1;
-MultiTimer timer2;
-MultiTimer timer3;
-uint64_t PlatformTicksGetFunc(void) {
-    return uwTick;
-}
-void LEDTimer1Callback(MultiTimer* timer, void *userData)
-{
-    static FlagStatus LedSta=RESET;
-    LED(LedSta);
-    LedSta=~LedSta;
-    printf("LED Status:%d\r\n",LedSta);
-    MultiTimerStart(timer, 500, LEDTimer1Callback, userData);
-}
-void ADCTimer2Callback(MultiTimer* timer, void *userData)
-{
-    printf("\r\n The current ADCH1 value = %d \r\n", ADC_ConvertedValue[0]);
-    printf("\r\n The current ADCH2 value = %d \r\n", ADC_ConvertedValue[1]);
-    printf("\r\n The current ADCH3 value = %d \r\n", ADC_ConvertedValue[2]);
-    printf("\r\n The current ADCH4 value = %d \r\n", ADC_ConvertedValue[3]);
-
-    MultiTimerStart(timer, 1000, ADCTimer2Callback, userData);
-}
-void ButtonTimer3Callback(MultiTimer* timer, void *userData)
-{
-    button_ticks();;
-    MultiTimerStart(timer, 5, ButtonTimer3Callback, userData);
-}
 void PollSystemInit(void) {
     MultiTimerInstall(PlatformTicksGetFunc);
-    MultiTimerStart(&timer1, 500, LEDTimer1Callback, NULL);
-    MultiTimerStart(&timer2, 1000, ADCTimer2Callback, NULL);
-    MultiTimerStart(&timer3, 5, ButtonTimer3Callback, NULL);
+    MultiTimerStart(&timer1, 5, LEDTimer1Callback, NULL);
+    MultiTimerStart(&timer2, 10, ADCTimer2Callback, NULL);
+    MultiTimerStart(&timer3, 15, ButtonTimer3Callback, NULL);
+    MultiTimerStart(&timer4, 20, ReportTimer4Callback, NULL);
     SYSTICK_Init_Config(SystemCoreClock/1000-1);
 }
-
 ```
 
-### 3.2.3 下载验证
+我们还是创建新建4个软件定时器，在回调函数里面执行对应的外设任务；LED同上节，无任何变化；接下来分别介绍各线程任务；
 
-我们把固件程序下载进去可以，打开串口调试助手；接H3排针的TX到USB转TTL模块，可以打印三个任务Log信息；
-![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/0e664def8cf446f2af99d8f53f3af23e.png)
+##### 3.4.2.2.1 鼠标结构体
 
+```c
+typedef struct
+{
+    u8 button;
+    s8 x;
+    s8 y;
+    s8 wheel;
+}MouseTypdef;
+MouseTypdef  MS_Data_Pack;
+```
+
+这里定义了鼠标报文，第一个结构体成员button代表鼠标按键，其中bit0代表鼠标左键，bit1代表鼠标右键，bit2则是鼠标中键；第二第三个结构体成员xy代表鼠标坐标位移；第四个wheel是滚轮位移；
+
+##### 3.2.2.2.2 ADC数据处理
+
+```c
+void ADCTimer2Callback(MultiTimer* timer, void *userData)
+{
+    static u8 AdcCount=0;
+    static u16 wtick=0;
+    static u32 A1Sum=0,A2Sum=0,A3Sum=0,A4Sum=0;
+    //u16 xtemp=0,ytemp=0,xtemp1=0,ytemp1=0;
+    u16 xtemp=0,ytemp=0,xtemp1=0;//ytemp1=0;
+
+    A1Sum+=ADC_ConvertedValue[0];
+    A2Sum+=ADC_ConvertedValue[1];
+    A3Sum+=ADC_ConvertedValue[2];
+    A4Sum+=ADC_ConvertedValue[3];
+    AdcCount+=1;
+    if(AdcCount==10)
+    {
+        //X
+        xtemp=Map( A1Sum/AdcCount, 0, 4095, 0, UINT8_MAX );
+        ytemp=Map( A2Sum/AdcCount, 0, 4095, 0, UINT8_MAX );
+
+        xtemp1=Map( A3Sum/AdcCount, 0, 4095, 0, UINT8_MAX );
+        //ytemp1=Map( A4Sum/AdcCount, 0, 4095, 0, UINT8_MAX );
+        //printf("CH: %d %d %d %d\r\n", xtemp,ytemp,xtemp1,ytemp1);
+        A1Sum=0;
+        A2Sum=0;
+        A3Sum=0;
+        //A4Sum=0;
+        AdcCount=0;
+
+        if(xtemp<(CENTER_X-10))
+        {
+            MS_Data_Pack.x=-(((CENTER_X-xtemp)>>DIV)+1);
+        }else if(xtemp>(CENTER_X+10))
+        {
+            MS_Data_Pack.x=((xtemp-CENTER_X)>>DIV)+1;;
+        }else{
+            MS_Data_Pack.x=0;
+        }
+        if(ytemp<(CENTER_Y-10))
+        {
+            MS_Data_Pack.y=-(((CENTER_Y-ytemp)>>DIV)+1);
+        }else if(ytemp>(CENTER_Y+10))
+        {
+            MS_Data_Pack.y=((ytemp-CENTER_Y)>>DIV)+1;;
+        }else{
+            MS_Data_Pack.y=0;
+        }
+        if(xtemp1<(CENTER_X1-64))
+        {
+            if(++wtick==5)
+            {
+                wtick=0;
+                MS_Data_Pack.wheel=1;
+            }else{
+                MS_Data_Pack.wheel=0;
+            }
+
+        }else if(xtemp1>(CENTER_X1+64))
+        {
+            if(++wtick==5)
+            {
+                wtick=0;
+                MS_Data_Pack.wheel=-1;
+            }else{
+                MS_Data_Pack.wheel=0;
+            }
+        }else{
+            wtick=0;
+            MS_Data_Pack.wheel=0;
+        }
+
+        //printf("X=%d Y=%d wheel=%d\r\n", MS_Data_Pack.x,MS_Data_Pack.y);
+    }
+
+    MultiTimerStart(timer, 1, ADCTimer2Callback, userData);
+}
+```
+
+这部分代码是取10次平均后得到平均值再做一个映射，将范围0~4095转出0~255；根据摇杆偏移中心点多少算出鼠标坐标和滚轮位移；
+
+##### 3.4.2.2.3 按键数据处理
+
+按键任务回调函数如下，一样没有变化；
+
+```c
+void ButtonTimer3Callback(MultiTimer* timer, void *userData)
+{
+    button_ticks();
+    MultiTimerStart(timer, 5, ButtonTimer3Callback, userData);
+}
+```
+
+在button.c中主要注册几个按键事件回调，按下和释放，如下
+
+```c
+void RSW_PRESS_UP_Handler(void* btn) {
+    printf("RSW_PRESS_UP_Handler\r\n");
+    MS_Data_Pack.button&=(~0x04);
+}
+void RSW_PRESS_DOWN_Handler(void* btn) {
+    printf("RSW_PRESS_DOWN_Handler\r\n");
+    MS_Data_Pack.button|=0x04;
+}
+void B_PRESS_UP_Handler(void* btn) {
+    printf("B_PRESS_UP_Handler\r\n");
+    MS_Data_Pack.button&=(~0x02);
+}
+void B_PRESS_DOWN_Handler(void* btn) {
+    printf("B_PRESS_DOWN_Handler\r\n");
+    MS_Data_Pack.button|=0x02;
+}
+void X_PRESS_UP_Handler(void* btn) {
+    printf("X_PRESS_UP_Handler\r\n");
+    MS_Data_Pack.button&=(~0x01);
+}
+void X_PRESS_DOWN_Handler(void* btn) {
+    printf("X_PRESS_DOWN_Handler\r\n");
+    MS_Data_Pack.button|=0x01;
+}
+void ButtonInit(void) {
+    //省略部分代码
+    button_attach(&btn2, PRESS_UP, RSW_PRESS_UP_Handler);
+    button_attach(&btn2, PRESS_DOWN, RSW_PRESS_DOWN_Handler);
+    button_attach(&btn11, PRESS_UP, B_PRESS_UP_Handler);
+    button_attach(&btn11, PRESS_DOWN, B_PRESS_DOWN_Handler);
+    button_attach(&btn12, PRESS_UP, X_PRESS_UP_Handler);
+    button_attach(&btn12, PRESS_DOWN, X_PRESS_DOWN_Handler);
+ 	//省略部分代码
+
+}
+```
+
+可以看到，上面按键代码主要是在按键按下置位弹起清零；
+
+
+
+### 3.4.3 下载验证
+
+我们把固件程序下载进去可以看到LD Mouse鼠标，摇动左摇杆是鼠标指针的位移；右摇杆左右没有功能，上下是滚轮上下，右摇杆按键是鼠标中键；X是鼠标左键，B是鼠标右键；
+![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/340610e6775c422aaf8dca3b1d51a538.png)

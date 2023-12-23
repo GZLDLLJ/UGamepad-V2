@@ -21,20 +21,20 @@ LDSCITECH始终秉承着开放、包容和学习的精神，我们期待与您�
 
 
 
-| **实例**             | **描述**                             |
-| -------------------- | ------------------------------------ |
-| Eg1_Joystick         | 实现一个Joystick摇杆设备             |
-| Eg2_WS2812B          | 点亮WS2812B灯珠并实现七彩渐变        |
-| Eg3_MultiTimer       | 移植MultiTimer软件定时器模块         |
-| Eg4_Mouse            | 实现模拟鼠标功能                     |
-| Eg5_KeyBoard         | 实现模拟键盘功能                     |
-| Eg6_DoubleJoystick   | 实现一个USB双摇杆                    |
-| Eg7_CompositeGMK     | 实现Joystick、MOUSE、Keyboard的组合  |
-| Eg8_Gamepad          | 实现游戏手柄Gamepad的功能            |
-| Eg9_AbsoluteMouse    | 实现绝对值鼠标的功能                 |
-| Eg10_Xinput          | 实现Xbox手柄功能，Xinput（出厂默认） |
-| Eg11_Xinput01        | 外接摇杆电位器实现Xbox手柄功能       |
-| Eg12_MultiAxisButton | 实现8轴32键摇杆                      |
+| **实例**         | **描述**                      |
+| ---------------- | ----------------------------- |
+| Eg01_ButtonDebug | 实现一个Joystick摇杆设备      |
+| Eg02_AnalogDebug | 点亮WS2812B灯珠并实现七彩渐变 |
+| Eg03_MultiTimer  | 移植MultiTimer软件定时器模块  |
+| Eg04_Mouse       | 实现模拟鼠标功能              |
+|                  |                               |
+|                  |                               |
+|                  |                               |
+|                  |                               |
+|                  |                               |
+|                  |                               |
+|                  |                               |
+|                  |                               |
 
 # 第一部分、硬件概述
 
@@ -44,7 +44,7 @@ LDSCITECH始终秉承着开放、包容和学习的精神，我们期待与您�
 
 
 
-如图1.1所示Gamepad评估板配置了8个6*6轻触按键，一个摇杆（Joystick），搭载一颗WS2812B灯珠，并将UART1串口，编程接口（SWD），外接Joystick接口，Type-C接口引出;  
+如图1.1所示Gamepad评估板配置了11个6*6轻触按键，两个摇杆（Joystick），搭载一颗LED灯珠，并将UART1串口（H3），编程接口（SWD H4），Type-C接口引出;  
 
 ## 1.2 UGamepad-V2原理图
 
@@ -427,14 +427,13 @@ void ButtonInit(void) {
 
 ## 3.2 实例Eg02_AnalogDebug
 
-本节作为这个实例主要是为了测试摇杆电位器；
+本节这个实例主要是为了测试摇杆电位器；
 
 ### 3.2.1硬件设计
 
 摇杆电位器原理图如下所示：
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/b4d84c401bc745cfa4bad9338f81b6e2.png#pic_center)
-
 
 所以，我们只要配置4路ADC输入检测两个电位器的XY;  MCU的配置如下：
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/direct/fcda7902e7e34a74af424b84adc1551d.png)
@@ -560,10 +559,10 @@ int main(void)
         if((tick%100)==0)//500ms
         {
             tick=0;
-            printf("\r\n The current ADCH1 value = %d \r\n", ADC_ConvertedValue[0]);
-            printf("\r\n The current ADCH2 value = %d \r\n", ADC_ConvertedValue[1]);
-            printf("\r\n The current ADCH3 value = %d \r\n", ADC_ConvertedValue[2]);
-            printf("\r\n The current ADCH4 value = %d \r\n", ADC_ConvertedValue[3]);
+            printf("\r\n The current ADCH1 value = %d \r\n", 				ADC_ConvertedValue[0]);
+            printf("\r\n The current ADCH2 value = %d \r\n", 	ADC_ConvertedValue[1]);
+            printf("\r\n The current ADCH3 value = %d \r\n", 		ADC_ConvertedValue[2]);
+            printf("\r\n The current ADCH4 value = %d \r\n", 	ADC_ConvertedValue[3]);
         }
         button_ticks();
         Delay_Ms(5);
@@ -806,8 +805,8 @@ const uint8_t MyCfgDescr[ ] =
         0x00,         /*bAlternateSetting: Alternate setting*/
         0x01,         /*bNumEndpoints*/
         0x03,         /*bInterfaceClass: CUSTOM_HID*/
-        0x00,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-        0x00,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0x01,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x02,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
         0,            /*iInterface: Index of string descriptor*/
         /******************** Descriptor of CUSTOM_HID *************************/
         /* 18 */
